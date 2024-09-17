@@ -1,14 +1,13 @@
-% Contributions from different orders of spin correlation to
-% the system trajectory in the pulse-acquire 1H NMR simulation
-% of anti-3,5-difluoroheptane (16 spins). Different curves 
-% correspond the norms of the projection of the density matrix
-% into the subspace of one-, two-, three-, etc. spin correlati-
-% ons. The two traces in the lower part of the figure corres-
-% pond to nine- and ten-spin correlations – it is clear that 
-% for practical simulation purposes only correlations of up to
-% eight spins need to be accounted for.
+% Contributions from different orders of spin correlation to the system 
+% trajectory in the pulse-acquire 1H NMR simulation of anti-3,5-difluo-
+% roheptane (16 spins). Different curves correspond the norms of the pro- 
+% jection of the density matrix into the subspace of one-, two-, three-,
+% etc. spin correlations. The two traces in the lower part of the figure
+% correspond to nine- and ten-spin correlations – it is clear that for
+% practical simulation purposes, even in the absence of relaxation, only
+% correlations of up to eight spins need to be accounted for.
 %
-% Run time: minutes (much faster on an Nvidia Titan V GPU)
+% Calculation time: minutes, faster with a GPU.
 %
 % i.kuprov@soton.ac.uk
 
@@ -24,22 +23,22 @@ sys.isotopes={'12C', '12C', '12C', '12C', '12C', '12C', '12C', ...
 
 % Chemical shifts
 inter.zeeman.scalar=cell(1,23);
-inter.zeeman.scalar{14}=    1.0092;
-inter.zeeman.scalar{15}=    1.0092;
-inter.zeeman.scalar{16}=    1.0092;
-inter.zeeman.scalar{21}=    1.0092;
-inter.zeeman.scalar{22}=    1.0092;
-inter.zeeman.scalar{23}=    1.0092;
-inter.zeeman.scalar{11}=    4.6834; 
-inter.zeeman.scalar{17}=    4.6834;
-inter.zeeman.scalar{10}= -184.1865;
-inter.zeeman.scalar{18}= -184.1865;
-inter.zeeman.scalar{8}=     1.7970;
-inter.zeeman.scalar{9}=     1.7970;
-inter.zeeman.scalar{13}=    1.6942;
-inter.zeeman.scalar{20}=    1.6942;
-inter.zeeman.scalar{19}=    1.6370;
-inter.zeeman.scalar{12}=    1.6370;
+inter.zeeman.scalar{14}= 1.0092;
+inter.zeeman.scalar{15}= 1.0092;
+inter.zeeman.scalar{16}= 1.0092;
+inter.zeeman.scalar{21}= 1.0092;
+inter.zeeman.scalar{22}= 1.0092;
+inter.zeeman.scalar{23}= 1.0092;
+inter.zeeman.scalar{11}= 4.6834; 
+inter.zeeman.scalar{17}= 4.6834;
+inter.zeeman.scalar{10}= 0.0000; % actually -184.1865, but does not 
+inter.zeeman.scalar{18}= 0.0000; % matter here, and faster when zero
+inter.zeeman.scalar{8}=  1.7970;
+inter.zeeman.scalar{9}=  1.7970;
+inter.zeeman.scalar{13}= 1.6942;
+inter.zeeman.scalar{20}= 1.6942;
+inter.zeeman.scalar{19}= 1.6370;
+inter.zeeman.scalar{12}= 1.6370;
 
 % J-couplings
 inter.coupling.scalar=cell(23);  
@@ -93,8 +92,8 @@ bas.projections=1;
 % Prevent automatic state dropout
 sys.disable={'zte'};
 
-% Enable greedy parallelisation
-sys.enable={'greedy','gpu'};
+% GPU is useful here
+sys.enable={'gpu'};
 
 % Spinach housekeeping 
 spin_system=create(sys,inter); 
@@ -109,9 +108,9 @@ H=hamiltonian(assume(spin_system,'nmr'));
 % Trajectory calculation
 traj=evolution(spin_system,H,[],rho,1e-3,1000,'trajectory');
 
-% Trajectory analysis
-figure(); trajan(spin_system,traj,'correlation_order');
-axis([0 1000 1e-6 5]); set(gca,'YScale','log');
+% Trajectory analysis by spin correlation order
+trajan(spin_system,traj,'correlation_order'); xlim tight;
+ylim([1e-6 3]); set(gca,'YScale','log');
 
 end
 

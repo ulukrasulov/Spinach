@@ -26,7 +26,7 @@
 %       is designed to minimize the memory footprint in large cases.
 %
 % i.kuprov@soton.ac.uk
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 % a.acharya@soton.ac.uk
 %
 % <https://spindynamics.org/wiki/index.php?title=step.m>
@@ -126,8 +126,15 @@ else
 end
 nsteps=ceil(norm_mat/2);
 
-% Warn user if the number is too large
-if nsteps>100
+% Step checks
+if nsteps>1e4
+
+    % Catch the common mistake of supplying wildly unreasonable |L*dt|
+    error('either dt is too long, or L is too big: |L*dt|>1e4, check both.');
+
+elseif nsteps>100
+
+    % Warn user if too many substeps are needed
     report(spin_system,['WARNING: ' num2str(nsteps)...
                         ' substeps required, consider using evolution() here.']);
 end

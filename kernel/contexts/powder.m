@@ -2,68 +2,84 @@
 % superoperator, the initial state, the coil state, then passes them 
 % on to the pulse sequence function. Syntax:
 %
-%   answer=powder(spin_system,pulse_sequence,parameters,assumptions)
+%      [answer,sph_grid]=powder(spin_system,pulse_sequence,...
+%                               parameters,assumptions)
 %
 % Parameters:
 %
-%  pulse_sequence     - pulse sequence function handle. See the
-%                       experiments directory for the list of
-%                       pulse sequences that ship with Spinach.
+%   pulse_sequence     - pulse sequence function handle. See the
+%                        experiments directory for the list of
+%                        pulse sequences that ship with Spinach.
+%  
+%   parameters.spins   - a cell array giving the spins that the
+%                        pulse sequence works on, in the order
+%                        of channels, e.g. {'1H','13C'}
+%
+%   parameters.offset  - a cell array giving transmitter offsets
+%                        in Hz on each of the spins listed in
+%                        parameters.spins
 % 
-%  parameters.spins   - a cell array giving the spins that the
-%                       pulse sequence works on, in the order
-%                       of channels, e.g. {'1H','13C'}
+%   parameters.grid    - name of the spherical averaging grid 
+%                        file (see the grids directory in the
+%                        kernel).
+% 
+%   parameters.rframes - rotating frame specification, e.g.
+%                        {{'13C',2},{'14N,3}} requests second
+%                        order rotating frame transformation
+%                        with respect to carbon-13 and third
+%                        order rotating frame transformation
+%                        with respect to nitrogen-14. When
+%                        this option is used, the assumptions
+%                        on the respective spins should be
+%                        laboratory frame.
 %
-%  parameters.offset  - a cell array giving transmitter offsets
-%                       in Hz on each of the spins listed in
-%                       parameters.spins
+%   parameters.needs   - a cell array of strings specifying ad-
+%                        ditional information required by the
+%                        sequence:
+% 
+%                        'zeeman_op' - Zeeman part of the Hami-
+%                        ltonian in the laboratory frame, to be
+%                        placed into parameters.hzeeman and sent
+%                        to the pulse sequence
 %
-%  parameters.grid    - name of the spherical averaging grid 
-%                       file (see the grids directory in the
-%                       kernel).
+%                        'iso_eq' - thermal equilibrium is com-
+%                        computed using the isotropic part of 
+%                        the Hamiltonian, and sent to the pulse
+%                        sequence via parameters.rho0
 %
-%  parameters.rframes - rotating frame specification, e.g.
-%                       {{'13C',2},{'14N,3}} requests second
-%                       order rotating frame transformation
-%                       with respect to carbon-13 and third
-%                       order rotating frame transformation
-%                       with respect to nitrogen-14. When
-%                       this option is used, the assumptions
-%                       on the respective spins should be
-%                       laboratory frame.
+%                        'aniso_eq' - thermal equilibrium is re-
+%                        computed using the full anisotropic Ha-
+%                        miltonian at each orientation, and sent
+%                        to pulse sequence via parameters.rho0
 %
-%  parameters.needs   - a cell array of strings specifying ad-
-%                       ditional information required by the
-%                       sequence:
+%   parameters.rho0    - initial state; may be a function handle
+%                        that depends on the three Euler angles
+%                        in ZYZ active convention
+%  
+%   parameters.serial  - if set to true, disables automatic pa-
+%                        rallelisation
 %
-%                       'zeeman_op' - Zeeman part of the Hami-
-%                       ltonian in the laboratory frame, to be
-%                       placed into parameters.hzeeman and sent
-%                       to the pulse sequence
+%   parameters.sum_up  - if set to false, causes the pulse sequ-
+%                        ence output at each orientation to be
+%                        returned instead of the powder average
 %
-%                       'aniso_eq' - thermal equilibrium is re-
-%                       computed using the full anisotropic Ha-
-%                       miltonian at each orientation, and sent
-%                       to pulse sequence via parameters.rho0
+%   parameters.*       - additional subfields may be required by
+%                        the pulse sequence - check its documen-
+%                        tation page 
+% 
+%   assumptions        - context-specific assumptions ('nmr', 'epr',
+%                        'labframe', etc.) - see the pulse sequence
+%                        header for information on this setting.
 %
-%  parameters.serial  - if set to true, disables automatic pa-
-%                       rallelisation
+% Outputs:
 %
-%  parameters.sum_up  - if set to false, causes the pulse sequ-
-%                       ence output at each orientation to be
-%                       returned instead of the powder average
+%   answer    - powder average of whatever it is that the pulse 
+%               sequence returns; if parameters.sum_up is set to
+%               false, a cell array of outputs at each orienta-
+%               tion is returned
 %
-%  parameters.*       - additional subfields may be required by
-%                       the pulse sequence - check its documen-
-%                       tation page 
-%
-%  assumptions        - context-specific assumptions ('nmr', 'epr',
-%                       'labframe', etc.) - see the pulse sequence
-%                       header for information on this setting.
-%
-% This function returns a powder average of whatever it is that the pul-
-% se sequence returns. If a data structure is returned by the pulse seq-
-% uence, data structures are powder averaged subfield-by-subfield.
+%   sph_grid -  powder averaging grid data structure with three 
+%               Euler angles and weights for each point
 %
 % Note: THIS IS FOR STATIC POWDERS - use singlerot for MAS simulations.
 %
@@ -75,12 +91,13 @@
 %       buted Computing Toolbox - different system orientations are eva-
 %       luated on different labs.
 %
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 % i.kuprov@soton.ac.uk
 %
 % <https://spindynamics.org/wiki/index.php?title=powder.m>
 
-function answer=powder(spin_system,pulse_sequence,parameters,assumptions)
+function [answer,sph_grid]=powder(spin_system,pulse_sequence,...
+                                  parameters,assumptions)
 
 % Show the banner
 banner(spin_system,'sequence_banner'); 
@@ -105,10 +122,12 @@ end
 % Get the lab frame Hamiltonian if needed
 if ismember('iso_eq',parameters.needs)
     
-    % Isotropic part and thermal equilibrium here
+    % Isotropic part of the lab frame Hamiltonian
     report(spin_system,'building the lab frame Hamiltonian...');
-    HL=hamiltonian(assume(spin_system,'labframe'),'left'); QL=[];
-    parameters.rho0=equilibrium(spin_system,HL);
+    HL=hamiltonian(assume(spin_system,'labframe'),'left'); 
+
+    % Compute thermal equilibrium here
+    parameters.rho0=equilibrium(spin_system,HL); QL=[];
 
 elseif ismember('aniso_eq',parameters.needs)
     
@@ -151,9 +170,10 @@ sph_grid=load([spin_system.sys.root_dir '/kernel/grids/' ...
 % Assign local variables
 alphas=sph_grid.alphas; betas=sph_grid.betas; 
 gammas=sph_grid.gammas; weights=sph_grid.weights;
+n_orients=numel(weights);
 
 % Preallocate answer array
-ans_array=cell(numel(weights),1);
+ans_array=cell(n_orients,1);
 
 % Run serially if needed
 if isfield(parameters,'serial')&&...
@@ -168,25 +188,42 @@ if isfield(parameters,'serial')&&...
 else
     
     % Parallel execution
-    nworkers=min([poolsize numel(weights)]);
+    nworkers=min([poolsize n_orients]);
 
 end
 
 % Inform the user and silence the output
-prev_setting=spin_system.sys.output;
-report(spin_system,['powder simulation with ' num2str(numel(weights)) ' orientations.']);
+prev_setting=spin_system.sys.output; ss_prev.sys.output=spin_system.sys.output;
+report(spin_system,['powder simulation with ' num2str(n_orients) ' orientations.']);
 if ~isfield(parameters,'verbose')||(parameters.verbose==0)
     report(spin_system,'pulse sequence silenced to avoid excessive output.')
     spin_system.sys.output='hush';
 end
 
-% MDCS diagnostics
-parallel_profiler_start;
+% Parfor rigging
+if ~isworkernode
+    D=parallel.pool.DataQueue;
+    afterEach(D,@(~)parfor_progr);
+    orients_done=0; last_toc=0;
+    tic; ticBytes(gcp); do_diag=true;
+else
+    do_diag=false; D=[];
+end
 
-% Powder averaging loop
-parfor (n=1:numel(weights),nworkers)
+% Parfor progress updater
+function parfor_progr()
+    orients_done=orients_done+1; last_message=toc-last_toc;
+    if (last_message>5)||(orients_done==n_orients)
+        report(ss_prev,[num2str(orients_done) '/' num2str(n_orients) ' orientations done, ' ...
+                        num2str(orients_done/toc) ' orientations per second.']); 
+        last_toc=toc;
+    end
+end
+
+% Parallel powder averaging loop
+parfor (n=1:n_orients,nworkers)
     
-    % Localise the parameter array
+    % Localise parameter array
     localpar=parameters;
 
     % Pass the current orientation to the pulse sequence
@@ -201,9 +238,17 @@ parfor (n=1:numel(weights),nworkers)
         localpar.hzeeman=(Z+Z')/2;
     end
     
-    % Compute thermal equilibrium at the current orientation
+    % Compute initial state at the current orientation
     if ismember('aniso_eq',parameters.needs)
+
+        % Anisotropic thermal equilibrium state from Hamiltonian and temperature
         localpar.rho0=equilibrium(spin_system,HL,QL,[alphas(n) betas(n) gammas(n)]);
+
+    elseif isfield(parameters,'rho0')&&isa(parameters.rho0,'function_handle')
+
+        % Anisotropic initial condition specified by the user
+        rho_init=parameters.rho0; localpar.rho0=rho_init(alphas(n),betas(n),gammas(n));
+
     end
     
     % Apply rotating frames
@@ -220,6 +265,9 @@ parfor (n=1:numel(weights),nworkers)
     
     % Run the simulation (it might return a structure)
     ans_array{n}=pulse_sequence(spin_system,localpar,H,R,K); %#ok<PFBNS>
+
+    % Report progress
+    if do_diag, send(D,n); end
     
 end
 
@@ -237,9 +285,8 @@ if parameters.sum_up
     
 else
     
-    % Return components and weights
-    answer.components=ans_array;
-    answer.weights=sph_grid.weights;
+    % Return components
+    answer=ans_array;
     
     % Inform the user
     report(spin_system,'returning pulse sequence outputs at each orientation...');
@@ -249,8 +296,13 @@ end
 % Unsilence the output
 spin_system.sys.output=prev_setting;
 
-% Get MDCS diagnostics
-parallel_profiler_report; 
+% Parfor performance
+if ~isworkernode
+    nbytes=mean(tocBytes(gcp),1)/2^20; walltime=toc();
+    report(spin_system,['average worker process received ' num2str(nbytes(1)) ...
+                        ' MB and sent back ' num2str(nbytes(2)) ' MB']);
+    report(spin_system,['powder average run time: ' num2str(walltime) ' seconds']);
+end
 
 end
 
@@ -354,6 +406,12 @@ end
 if isfield(parameters,'needs')
     if ismember('iso_eq',parameters.needs)&&ismember('aniso_eq',parameters.needs)
         error('iso_eq and aniso_eq needs cannot be specified simultaneously.');
+    end
+    if isfield(parameters,'rho0')
+        if ismember('iso_eq',parameters.needs)||...
+           ismember('aniso_eq',parameters.needs)
+            error('parameters.needs cannot request initial condition when parameters.rho0 is specified.');
+        end
     end
 end
 

@@ -176,13 +176,15 @@ if ~isempty(spin_system.sys.disable)
     if ismember('trajlevel',spin_system.sys.disable), report(spin_system,'         > trajectory analysis inside evolution() function'); end
     if ismember('merge',spin_system.sys.disable),     report(spin_system,'         > small subspace merging inside evolution() function'); end
     if ismember('colorbar',spin_system.sys.disable),  report(spin_system,'         > colorbar drawing by plotting utilities'); end
+    if ismember('asyredf',spin_system.sys.disable),   report(spin_system,'         > asynchronous Redfied superoperator evaluation'); end
 end
 
 % Enabled features report
 if ~isempty(spin_system.sys.enable)
     report(spin_system,'WARNING: the following functionality is enabled by the user');
     if ismember('gpu',spin_system.sys.enable),        report(spin_system,'         > GPU arithmetic'); end
-    if ismember('caching',spin_system.sys.enable),    report(spin_system,'         > propagator caching'); end
+    if ismember('op_cache',spin_system.sys.enable),   report(spin_system,'         > operator caching'); end
+    if ismember('prop_cache',spin_system.sys.enable), report(spin_system,'         > propagator caching'); end
     if ismember('greedy',spin_system.sys.enable),     report(spin_system,'         > greedy parallelisation'); end
     if ismember('xmemlist',spin_system.sys.enable),   report(spin_system,'         > state-cluster cross-membership list generation'); end
     if ismember('paranoia',spin_system.sys.enable),   report(spin_system,'         > paranoid numerical accuracy settings'); end
@@ -260,9 +262,6 @@ if ~isworkernode
         report(spin_system,['         > parallel profile: ' spin_system.sys.parallel{1}]);
         report(spin_system,['         > workers to start: ' num2str(spin_system.sys.parallel{2})]);
 
-        % Disable worker proxies
-        pctconfig('optimizedpoolbroadcast',false,'reliableconnections',false);
-        
         % Get cluster object
         c=parcluster(spin_system.sys.parallel{1});
         
@@ -315,6 +314,11 @@ if ~isworkernode
             warning('off','MATLAB:maxNumCompThreads:Deprecated');
             ncores=max([1 floor(feature('numcores')/spmdSize)]);
             maxNumCompThreads(ncores);
+
+            % First worker is special
+            if spmdIndex==1
+                maxNumCompThreads(feature('numcores'));
+            end
 
         end
 
@@ -389,6 +393,11 @@ banner(spin_system,'spin_system_banner');
 spin_system.comp.isotopes=sys.isotopes;
 spin_system.comp.nspins=numel(spin_system.comp.isotopes);
 sys=rmfield(sys,'isotopes');
+
+% Hash isotopes array for caching operations later
+if ismember('op_cache',spin_system.sys.enable)
+    spin_system.comp.iso_hash=md5_hash(spin_system.comp.isotopes);
+end
 
 % Text labels for spins
 if isfield(sys,'labels')
@@ -1161,7 +1170,7 @@ if isfield(sys,'disable')
         error('sys.disable must be a cell array of strings.');
     end
     if any(~ismember(sys.disable,{'zte','pt','symmetry','krylov','clean-up','hygiene',...
-                                  'dss','expv','trajlevel','merge','colorbar'}))
+                                  'dss','expv','trajlevel','merge','colorbar','asyredf'}))
         error('unrecognised switch in sys.disable field.');
     end
 end
@@ -1171,8 +1180,8 @@ if isfield(sys,'enable')
     if (~iscell(sys.enable))||any(~cellfun(@ischar,sys.enable))
         error('sys.enable must be a cell array of strings.');
     end
-    if any(~ismember(sys.enable,{'gpu','caching','xmemlist','greedy','paranoia',...
-                                 'cowboy','polyadic','dafuq'}))
+    if any(~ismember(sys.enable,{'gpu','op_cache','xmemlist','greedy','paranoia',...
+                                 'cowboy','polyadic','dafuq','prop_cache'}))
         error('unrecognised switch in sys.enable field.');
     end
 end
@@ -1368,7 +1377,7 @@ if isfield(inter,'zeeman')
         
         % Check length
         if numel(inter.zeeman.scalar)~=numel(sys.isotopes)
-            error('the number of elements in the inter.zeeman.scalar array should match the number of spins.');
+            error('the number of elements in the inter.zeeman.scalar array must match the number of spins.');
         end
         
         % Make sure all non-empty elements are real numbers

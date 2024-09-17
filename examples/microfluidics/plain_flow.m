@@ -43,7 +43,7 @@ spin_system=mesh_preplot(spin_system);                           % Run output pr
 
 % Initial condition: Lz in a few cells
 parameters.rho0_ph{1}=zeros(spin_system.mesh.vor.ncells,1);
-parameters.rho0_ph{1}(140:160)=1;
+parameters.rho0_ph{1}(140:160)=2;
 parameters.rho0_st{1}=state(spin_system,'Lz','1H');
 
 % Detection state: Lz in all cells
@@ -53,8 +53,8 @@ parameters.coil_st{1}=state(spin_system,'Lz','1H');
 % Sequence and timing parameters
 parameters.spins={'1H'};
 parameters.offset=0;
-parameters.dt=80; 
-parameters.npoints=500;
+parameters.dt=160; 
+parameters.npoints=50;
 
 % Set assumptions
 spin_system=assume(spin_system,'nmr');
@@ -68,6 +68,9 @@ parameters.H_ph={ones(2659,1)};
 % Same relaxation everywhere
 parameters.R_op={relaxation(spin_system)}; 
 parameters.R_ph={ones(2659,1)};
+
+% No diffusion
+parameters.diff=0;
 
 % Drainage in the distal pipe
 drainage=zeros(2659,1); 
@@ -102,7 +105,7 @@ for n=1:size(traj,2)
     mesh_plot(spin_system,0,0);
     conc_plot(spin_system,conc);
     zlim(spin_system.mesh.zext);
-    set(gca,'DataAspectRatio',[1 1 0.05])
+    set(gca,'DataAspectRatio',[1 1 0.05]);
     camorbit(0.5,0); drawnow();
         
 end 

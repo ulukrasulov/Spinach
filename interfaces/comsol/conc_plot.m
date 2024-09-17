@@ -103,9 +103,11 @@ end
 
 % Draw lids and bottoms of the bars as a multifaceted patch
 patch('Faces',F,'Vertices',V,'FaceColor','flat',...
-      'FaceVertexCData',FRGB,'EdgeColor','none'); V(:,3)=0;
+      'FaceVertexCData',FRGB,'EdgeColor','black',...
+      'LineWidth',0.25,'LineJoin','round'); V(:,3)=0;
 patch('Faces',F,'Vertices',V,'FaceColor','flat',...
-      'FaceVertexCData',FRGB,'EdgeColor','none');
+      'FaceVertexCData',FRGB,'EdgeColor','black',...
+      'LineWidth',0.125,'LineJoin','round');
 
 % Loop over cells
 V=zeros(0,3); patch_idx=0; 
@@ -124,21 +126,22 @@ for n=1:spin_system.mesh.vor.ncells
         nvert=numel(vor_cell_z);
         
         % Build the face connectivity index
-        F_current=nan(0,5);
-        for k=0:(nvert-2)
+        F_current=nan(nvert,5); FRGB_current=nan(nvert,3);
+        for k=1:(nvert-1)
 
             % Build each wall
-            F_current=[F_current; mod([k k+1 k+nvert+1 k+nvert k],2*nvert)+1]; %#ok<AGROW> 
+            F_current(k,:)=[k k+1 k+nvert+1 k+nvert k]+patch_idx;
 
             % Add the colour spec
-            FRGB=[FRGB; RGB(n,:)]; %#ok<AGROW>
+            FRGB_current(k,:)=RGB(n,:);
 
         end
+        F_current(nvert,:)=[nvert 1 nvert+1 2*nvert nvert]+patch_idx;
+        FRGB_current(nvert,:)=RGB(n,:);
         
         % Add walls to the total
-        F_current=F_current+patch_idx; 
         patch_idx=patch_idx+2*nvert;
-        F=[F; F_current];  %#ok<AGROW>
+        F=[F; F_current]; FRGB=[FRGB; FRGB_current]; %#ok<AGROW>
         
     end
     
@@ -146,7 +149,8 @@ end
 
 % Draw the sides of the bars as a multifaceted patch
 patch('Faces',F,'Vertices',V,'FaceColor','flat',...
-      'FaceVertexCData',FRGB,'EdgeColor','none');
+      'FaceVertexCData',FRGB,'EdgeColor','black',...
+      'LineWidth',0.25,'LineJoin','round');
 
 end
 

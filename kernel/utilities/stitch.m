@@ -67,38 +67,19 @@ Pm=clean_up(spin_system,Pm,spin_system.tols.prop_chop);
 if ismember('gpu',spin_system.sys.enable)
     
     % Upload the problem to GPU
-    P=gpuArray(P);
-    Pm=gpuArray(Pm);
+    P=gpuArray(P); 
+    Pm=gpuArray(Pm); 
     Pct=gpuArray(Pct); 
-    rho_stack=gpuArray(rho_stack);
+    rho_stack=gpuArray(rho_stack); 
     coil_stack=gpuArray(coil_stack);
     
     % Inform the user
     report(spin_system,'stitching will be done on GPU.');
     
-elseif (~isworkernode)&&(nnz(P)>1e6)
-    
-    % Distribute arrays
-    P=distributed(P); 
-    Pm=distributed(Pm);
-    Pct=distributed(Pct);
-    rho_stack=distributed(rho_stack);
-    coil_stack=distributed(coil_stack);
-    
-    % Reslice propagators
-    spmd
-        P=redistribute(P,codistributor1d(1));
-        Pm=redistribute(Pm,codistributor1d(1));
-        Pct=redistribute(Pct,codistributor1d(1));
-    end
-    
-    % Inform the user
-    report(spin_system,'distributed stitching on CPU.');
-    
 else
     
     % Inform the user
-    report(spin_system,'stitching on CPU.');
+    report(spin_system,'stitching will be done on CPU.');
     
 end
 

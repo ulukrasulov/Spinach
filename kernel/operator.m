@@ -11,10 +11,11 @@
 %
 % the function returns the sum of the corresponding single-spin operators 
 % (Hilbert space) or superoperators (Liouville space) on all spins of that
-% type. Valid labels for operators in this type of call are 'E' (identity),
-% 'Lz', 'Lx', 'Ly', 'L+', 'L-', and 'Tl,m' (irreducible spherical tensor,
-% l and m are integers). Valid labels for spins are standard isotope names
-% as well as 'electrons', 'nuclei' and 'all'.
+% type. Valid labels for states in this type of call are 'E' (identity),
+% 'Lz', 'Lx', 'Ly', 'L+', 'L-', 'Tl,m' (irreducible spherical tensor, l 
+% and m are integers), 'CTx', 'CTy', 'CTz', 'CT+', 'CT-' (central transi-
+% tion operators in the Zeeman basis). Valid labels for spins are standard 
+% isotope names, as well as 'electrons', 'nuclei', and 'all'.
 %
 % 2. If operators is a string and spins is a vector
 %
@@ -59,7 +60,7 @@
 %        mutation superoperator of a product. In Liouville space, you cannot
 %        generate single-spin superoperators and multiply them up.
 %
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 % i.kuprov@soton.ac.uk
 %
 % <https://spindynamics.org/wiki/index.php?title=operator.m>
@@ -72,8 +73,24 @@ if ~exist('operator_type','var'), operator_type='comm'; end
 % The default sparse matrix format is CSC
 if ~exist('format','var'), format='csc'; end
 
-% Validate the input
-grumble(spin_system,operators,spins,operator_type,format);
+% Check consistency
+grumble(spin_system,operators,spins,operator_type,format); tic;
+
+% Check disk cache
+if ismember('op_cache',spin_system.sys.enable)
+
+    % Combine specification, isotopes, and basis hash
+    op_hash=md5_hash({operators,spins,operator_type,...
+                      format,spin_system.comp.iso_hash,...
+                      spin_system.bas.basis_hash});
+
+    % Generate the cache record name in the global scratch (for later reuse)
+    filename=[spin_system.sys.scratch filesep 'spinach_op_' op_hash '.mat'];
+
+    % Load the operator from the cache record
+    if exist(filename,'file'), load(filename,'A'); return; end
+    
+end
 
 % Parse the human specification into Spinach notation
 [opspecs,coeffs]=human2opspec(spin_system,operators,spins);
@@ -199,6 +216,11 @@ if strcmp(format,'csc')
     % Make a sparse matrix, making sure it's complex for later
     A=sparse(A(:,1),A(:,2),complex(A(:,3)),matrix_dim,matrix_dim);
 
+end
+
+% Write the cache record if caching is beneficial
+if ismember('op_cache',spin_system.sys.enable)&&(toc>0.1)
+    save(filename,'A','-v7.3'); 
 end
 
 end

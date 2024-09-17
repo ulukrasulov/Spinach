@@ -17,15 +17,14 @@
 %       calculation setup.
 %
 % Note: propagator caching (https://doi.org/10.1063/1.4928978) is
-%       supported, add 'caching' to sys.enable array during calcu-
-%       lation setup.
+%       supported, add 'prop_cache' to sys.enable array to enable.
 %
 % Note: we did have Chebyshev and Newton series here at one point,
 %       as well as the Pade method. None of them lived up to their
 %       marketing.
 %
 % i.kuprov@soton.ac.uk
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 %
 % <https://spindynamics.org/wiki/index.php?title=propagator.m>
 
@@ -47,7 +46,7 @@ report(spin_system,['generator dimension ' num2str(size(A,1)) ...
                     '%, sparsity ' num2str(issparse(A))]);
 
 % Check the cache
-if ismember('caching',spin_system.sys.enable)
+if ismember('prop_cache',spin_system.sys.enable)
     
     % Generate the cache record name in the global scratch (for later reuse)
     filename=[spin_system.sys.scratch filesep 'spinach_prop_' md5_hash(A) '.mat'];
@@ -164,11 +163,8 @@ report(spin_system,['propagator dimension ' num2str(size(P,1)) ...
 % Run the squaring stage
 if n_squarings>0
     
-    % Inform the user
-    report(spin_system,'setting up the squaring process...');
-    
     % Run the appropriate squaring process
-    if ismember('gpu',spin_system.sys.enable)&&(size(P,1)>500)
+    if ismember('gpu',spin_system.sys.enable)
         
         % Move to GPU
         P=gpuArray(P);
@@ -187,35 +183,9 @@ if n_squarings>0
         % Gather the propagator
         P=gather(P);
         
-    elseif (~isworkernode)&&(nnz(P)>1e6)&&issparse(P)
-        
-        % Distribute the propagator
-        P=distributed(P);
-        
-        % Run codistributed CPU squaring
-        spmd
-            
-            % Run the squaring stage
-            for n=1:n_squarings
-                
-                % Inform the user
-                if spmdIndex==spmdSize
-                    report(spin_system,['codistributed CPU squaring step ' num2str(n) '...']);
-                end
-                
-                % Square the propagator
-                P=clean_up(spin_system,P*P,spin_system.tols.prop_chop);
-                
-            end
-            
-        end
-        
-        % Back to CPU
-        P=gather(P);
-        
     else
         
-        % Run serial CPU squaring
+        % Run CPU squaring
         for n=1:n_squarings
             
             % Inform the user
@@ -237,10 +207,10 @@ if n_squarings>0
 end
     
 % Write the cache record if caching is beneficial
-if ismember('caching',spin_system.sys.enable)&&(toc>0.1)
+if ismember('prop_cache',spin_system.sys.enable)&&(toc>0.1)
     
     % Save the propagator
-    save(filename,'P','-v7.3','-nocompression'); 
+    save(filename,'P','-v7.3'); 
     report(spin_system,'cache record saved.');
     
 elseif ismember('caching',spin_system.sys.enable)

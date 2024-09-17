@@ -19,8 +19,11 @@
 %
 % Note: the auxiliary matrix method is massively faster than either
 %       commutator series or diagonalisation.
+%
+% Note: this is the most memory-intensive stage in a lot of calcula-
+%       tions; memory recycling is aggressive.
 % 
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 % david.goodwin@inano.au.dk
 % i.kuprov@soton.ac.uk
 %
@@ -41,6 +44,9 @@ auxmat=[-A, 1i*B; 0*A, -C];
 BE1=spdiags(ones(size(A,1),1), 0        ,2*size(A,1),size(A,2));
 BE2=spdiags(ones(size(A,1),1),-size(A,1),2*size(A,1),size(A,2));
 
+% Reclaim memory
+clear('A','B','C');
+
 % Exponentiate the auxiliary matrix
 auxmat=propagator(spin_system,auxmat,T);
 
@@ -54,22 +60,10 @@ P=(BE1'*auxmat*BE1)'; Q=(BE1'*auxmat*BE2);
 clear('auxmat','BE1','BE2');
 
 % Multiply up the blocks
-if (~isworkernode)&&(nnz(P)>1e6)&&issparse(P)
-    
-    % Codistributed multiplication
-    P=distributed(P); Q=distributed(Q);
-    spmd
-        R=clean_up(spin_system,P*Q,spin_system.tols.prop_chop);
-        P=[]; Q=[]; %#ok<NASGU>
-    end
-    R=gather(R);
-    
-else
-    
-    % Serial multiplication
-    R=clean_up(spin_system,P*Q,spin_system.tols.prop_chop);
-    
-end
+R=clean_up(spin_system,P*Q,spin_system.tols.prop_chop);
+
+% Reclaim memory
+clear('P','Q');
 
 end
 

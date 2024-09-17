@@ -30,7 +30,7 @@
 %       the sparse matrix addition efficiency problem.
 %
 % i.kuprov@soton.ac.uk
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 % hannah.hogben@chem.ox.ac.uk
 % d.savostyanov@soton.ac.uk
 %
@@ -601,6 +601,26 @@ oper=cell(size(descr,1),1);
 parfor_ss.sys=spin_system.sys; parfor_ss.tols=spin_system.tols;
 parfor_ss.bas=spin_system.bas; parfor_ss.comp=spin_system.comp;
 
+% Parfor rigging
+if ~isworkernode
+    D=parallel.pool.DataQueue;
+    afterEach(D,@(~)parfor_progr);
+    terms_done=0; last_toc=0;
+    tic; ticBytes(gcp); do_diag=true;
+else
+    do_diag=false; D=[];
+end
+
+% Parfor progress updater
+function parfor_progr()
+    terms_done=terms_done+1; last_message=toc-last_toc;
+    if (last_message>5)||(terms_done==nterms)
+        report(spin_system,[num2str(terms_done) '/' num2str(nterms) ' operators done, ' ...
+                            num2str(terms_done/toc) ' operators per second.']); 
+        last_toc=toc;
+    end
+end
+
 % Build component operators in XYZ form
 report(spin_system,'building individual operators...'); tic;
 parfor n=1:nterms
@@ -616,6 +636,16 @@ parfor n=1:nterms
                                    {descr_line.nL ,descr_line.nS },operator_type,'xyz');
     end
 
+    % Report progress
+    if do_diag, send(D,n); end
+
+end
+
+% Parfor communication stats
+if ~isworkernode
+    nbytes=mean(tocBytes(gcp),1)/2^20;
+    report(spin_system,['average worker process received ' num2str(nbytes(1)) ...
+                        ' MB and sent back ' num2str(nbytes(2)) ' MB']);
 end
 
 % Clean up and do the reporting

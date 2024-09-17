@@ -93,7 +93,7 @@
 % http://dx.doi.org/10.1063/1.3679656 for further information.
 %
 % i.kuprov@soton.ac.uk
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 % ohad.levinkron@weizmann.ac.il
 %
 % <https://spindynamics.org/wiki/index.php?title=evolution.m>
@@ -816,19 +816,14 @@ switch spin_system.bas.formalism
                                 P_sub=propagator(spin_system,L_sub,timestep);
                                 
                                 % Distribute the initial condition
-                                rho_sub=distributed(rho_sub);
+                                rho_sub=distrib_dim(rho_sub,2);
                             
                                 % Distribute covector array
-                                cov_sub=distributed.speye(size(rho_sub));
+                                cov_sub=speye(size(rho_sub));
+                                cov_sub=distrib_dim(cov_sub,2);
                             
                                 % Parallel processing
                                 spmd
-                                
-                                    % Slice density matrix and covectors
-                                    defpar=codistributor1d.defaultPartition(size(rho_sub,2));
-                                    codist=codistributor('1d',2,defpar);
-                                    rho_sub=redistribute(rho_sub,codist);
-                                    cov_sub=redistribute(cov_sub,codist);
                                 
                                     % Localize the problem and save memory
                                     rho_local=getLocalPart(rho_sub); rho_sub=[]; %#ok<NASGU>

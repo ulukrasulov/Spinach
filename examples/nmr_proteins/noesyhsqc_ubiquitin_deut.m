@@ -5,7 +5,7 @@
 %
 % Calculation time: a week on 32 cores, needs 512 GB of RAM.
 %
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 % i.kuprov@soton.ac.uk
 % andras_boeszoermenyi@hms.harvard.edu
 
@@ -26,7 +26,6 @@ sys.magnet=21.1356;
 % Tolerances
 sys.tols.inter_cutoff=2.0;
 sys.tols.prox_cutoff=4.0;
-sys.enable={'greedy'};
 
 % Relaxation theory
 inter.relaxation={'redfield','t1_t2'};
@@ -41,6 +40,10 @@ bas.formalism='sphten-liouv';
 bas.approximation='IK-1';
 bas.connectivity='scalar_couplings';
 bas.level=4; bas.space_level=3;
+
+% Algorithmic options
+sys.enable={'prop_cache','greedy'};
+sys.disable={'asyredf'};
 
 % Create the spin system structure
 spin_system=create(sys,inter);

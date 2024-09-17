@@ -22,7 +22,7 @@
 %        again.
 %
 % i.kuprov@soton.ac.uk
-% luke.edwards@ucl.ac.uk
+% ledwards@cbs.mpg.de
 %
 % <https://spindynamics.org/wiki/index.php?title=kill_spin.m>
 
@@ -38,8 +38,11 @@ if any(hit_list==0), hit_list=find(hit_list); end
 report(spin_system,['removing ' num2str(numel(hit_list)) ...
                     ' spins from the system...']);
 
-% Update isotopes list
+% Update isotopes list and its hash
 spin_system.comp.isotopes(hit_list)=[];
+if ismember('op_cache',spin_system.sys.enable)
+    spin_system.comp.iso_hash=md5_hash(spin_system.comp.isotopes);
+end
 
 % Update spin numbers
 spin_system.comp.nspins=spin_system.comp.nspins-numel(hit_list);
