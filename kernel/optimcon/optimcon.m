@@ -481,9 +481,17 @@ if isfield(control,'drifts')
     store=gcp('nocreate').ValueStore;
     put(store,vs_labels,control.drifts);
 
+
+
+    % REMOVE only needed when stepping without PARFOR in ensemble
+    spin_system.control.drifts=control.drifts;
+    
     % Only keep the overall drift count
     spin_system.control.ndrifts=numel(control.drifts); 
     control=rmfield(control,'drifts');
+
+
+    
 
 else
     
@@ -899,6 +907,44 @@ else
     spin_system.control.cpm_nph=1;
     
 end
+
+% Process response matrices
+if isfield(control, 'response')
+    % Check if control.response is a 1x2 cell array
+    if iscell(control.response) && numel(control.response) == 2
+        % Check if each matrix has the correct number of columns
+        valid_response = true;
+        for i = 1:2
+            if size(control.response{i}, 2) ~= numel(spin_system.control.pulse_dt)
+                valid_response = false;
+                break;
+            end
+        end
+        
+        if valid_response
+            % Inform the user that response matrices have been created
+            report(spin_system, 'Response matrices found. Cell 1 is response matrix for Lx, Cell 2 is response matrix for Ly.');
+            % Absorb the response matrices into spin_system.control.response
+            spin_system.control.response = control.response;
+            control=rmfield(control,'response');
+        else
+            % If the number of columns is incorrect, fill with identity matrices
+            report(spin_system, 'Response matrices do not match the size of pulse_dt. Creating identity matrices for Lx and Ly.');
+            spin_system.control.response = {eye(numel(spin_system.control.pulse_dt)), eye(numel(spin_system.control.pulse_dt))};
+            control=rmfield(control,'response');
+        end
+    else
+        % If not 1x2, fill with identity matrices
+        report(spin_system, 'Response matrices are not 1x2. Creating identity matrices for Lx and Ly.');
+        spin_system.control.response = {eye(numel(spin_system.control.pulse_dt)), eye(numel(spin_system.control.pulse_dt))};
+        control=rmfield(control,'response');
+    end
+else
+    % Create identity matrices for response if not provided
+    spin_system.control.response = {eye(numel(spin_system.control.pulse_dt)), eye(numel(spin_system.control.pulse_dt))};
+    report(spin_system, 'Response matrices not found. Creating identity matrices for Lx and Ly.');
+end
+
 
 % Inform the user
 report(spin_system,[pad('Control power modulation frequency, Hz',60) ...

@@ -109,10 +109,9 @@ else
     error('unknown parallelisation strategy.');
 
 end
-    
 % Run the ensemble loop
 parfor (n=1:n_cases,nworkers) %#ok<*PFBNS>
-    
+% for n=1:n_cases
     % Extract ensemble indices
     n_rho=catalog(n,1); n_sys=catalog(n,2);
     n_pwr=catalog(n,3); n_off=catalog(n,4);
@@ -213,6 +212,9 @@ parfor (n=1:n_cases,nworkers) %#ok<*PFBNS>
         store=getCurrentValueStore(); 
         L=store(['oc_drift_' num2str(n_sys)]);
     end
+    
+    % Uncomment if using FOR loop
+    % L=spin_system.control.drifts{:};
       
     % Add offset terms
     if ~isempty(off_ens_sizes)
@@ -238,12 +240,13 @@ parfor (n=1:n_cases,nworkers) %#ok<*PFBNS>
 
     end
         
-    % Call GRAPE
+    % Call GRAPE with response matrix. If response matrix is not provided
+    % set it identity matrix of size equal to waveform
     if n_outputs==2
             
         % Fidelity and trajectory
         [traj_data{n},...
-         fidelities{n}]=grape(spin_system,L,spin_system.control.operators,...
+         fidelities{n}]=grape_res_mat(spin_system,L,spin_system.control.operators,...
                               power_lvl*local_waveform,rho_init,rho_targ,...
                               spin_system.control.fidelity);
                                        
@@ -252,7 +255,7 @@ parfor (n=1:n_cases,nworkers) %#ok<*PFBNS>
         % Fidelity, gradient and trajectory
         [traj_data{n}, ...
          fidelities{n},...
-         gradients{n}]=grape(spin_system,L,spin_system.control.operators,...
+         gradients{n}]=grape_res_mat(spin_system,L,spin_system.control.operators,...
                              power_lvl*local_waveform,rho_init,rho_targ,...
                              spin_system.control.fidelity);
                                                 
