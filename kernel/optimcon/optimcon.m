@@ -908,43 +908,64 @@ else
     
 end
 
-% Process response matrices
+% Process response functions and Jacobian functions
 if isfield(control, 'response')
-    % Check if control.response is a 1x2 cell array
-    if iscell(control.response) && numel(control.response) == 2
-        % Check if each matrix has the correct number of columns
-        valid_response = true;
-        for i = 1:2
-            if size(control.response{i}, 2) ~= numel(spin_system.control.pulse_dt)
-                valid_response = false;
-                break;
+    if iscell(control.response)
+        % Check if the cell array has exactly 3 elements
+        if numel(control.response) == 3
+            % Extract the components
+            response_function = control.response{1};
+            jacobian_function = control.response{2};
+            parameters = control.response{3};
+            
+            % Validate response_function
+            if ~isa(response_function, 'function_handle')
+                error('The response function must be a function handle.');
             end
-        end
-        
-        if valid_response
-            % Inform the user that response matrices have been created
-            report(spin_system, 'Response matrices found. Cell 1 is response matrix for Lx, Cell 2 is response matrix for Ly.');
-            % Absorb the response matrices into spin_system.control.response
-            spin_system.control.response = control.response;
-            control=rmfield(control,'response');
+            
+            % Validate jacobian_function
+            if ~(isempty(jacobian_function) || isa(jacobian_function, 'function_handle'))
+                error('The Jacobian function must be a function handle or empty.');
+            end
+            
+            % Validate parameters
+            if ~iscell(parameters)
+                error('The response function parameters must be provided in a cell array.');
+            end
+            
+            % Initialize a flag for finite differences
+            use_finite_differences = false;
+            
+            % Check if jacobian_function is empty
+            if isempty(jacobian_function)
+                % Warn that finite differences will be used
+                warning('The Jacobian function is not provided. Estimating it using finite differences, which may take a long time.');
+                use_finite_differences = true;
+            elseif isequal(response_function, jacobian_function)
+                % Inform that the response function is linear
+                warning('The response function and the Jacobian function are the same. Assuming a linear response function.');
+            end
+            
+            % Store the response functions and parameters
+            spin_system.control.response_function = response_function;
+            spin_system.control.jacobian_function = jacobian_function;
+            spin_system.control.response_parameters = parameters;
+            spin_system.control.use_finite_differences = use_finite_differences;
+            control = rmfield(control, 'response');
+            
         else
-            % If the number of columns is incorrect, fill with identity matrices
-            report(spin_system, 'Response matrices do not match the size of pulse_dt. Creating identity matrices for Lx and Ly.');
-            spin_system.control.response = {eye(numel(spin_system.control.pulse_dt)), eye(numel(spin_system.control.pulse_dt))};
-            control=rmfield(control,'response');
+            % Response cell array must have exactly 3 elements
+            error('The ''control.response'' field must be a cell array with exactly three elements: {@response_function, @jacobian_function (optional), {parameters}}.');
         end
     else
-        % If not 1x2, fill with identity matrices
-        report(spin_system, 'Response matrices are not 1x2. Creating identity matrices for Lx and Ly.');
-        spin_system.control.response = {eye(numel(spin_system.control.pulse_dt)), eye(numel(spin_system.control.pulse_dt))};
-        control=rmfield(control,'response');
+        % Invalid response field type
+        error('The ''control.response'' field must be a cell array. Expected format: {@response_function, @jacobian_function (optional), {parameters}}.');
     end
 else
-    % Create identity matrices for response if not provided
-    spin_system.control.response = {eye(numel(spin_system.control.pulse_dt)), eye(numel(spin_system.control.pulse_dt))};
-    report(spin_system, 'Response matrices not found. Creating identity matrices for Lx and Ly.');
+    % Response functions not provided
+    control = rmfield(control, 'response');
+    warning('No ''control.response'' field provided. Proceeding without response function input. Normal GRAPE applied.');
 end
-
 
 % Inform the user
 report(spin_system,[pad('Control power modulation frequency, Hz',60) ...

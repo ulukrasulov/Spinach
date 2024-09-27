@@ -111,7 +111,7 @@ else
 end
 % Run the ensemble loop
 parfor (n=1:n_cases,nworkers) %#ok<*PFBNS>
-% for n=1:n_cases
+%for n=1:n_cases
     % Extract ensemble indices
     n_rho=catalog(n,1); n_sys=catalog(n,2);
     n_pwr=catalog(n,3); n_off=catalog(n,4);
@@ -204,7 +204,7 @@ parfor (n=1:n_cases,nworkers) %#ok<*PFBNS>
     % Get the power_level
     power_lvl=spin_system.control.pwr_levels(n_pwr);
     
-    % Get drifts from pool ValueStore
+    %Get drifts from pool ValueStore
     if nworkers==0
         store=gcp('nocreate').ValueStore; 
         L=store(['oc_drift_' num2str(n_sys)]);
@@ -213,8 +213,8 @@ parfor (n=1:n_cases,nworkers) %#ok<*PFBNS>
         L=store(['oc_drift_' num2str(n_sys)]);
     end
     
-    % Uncomment if using FOR loop
-    % L=spin_system.control.drifts{:};
+    %Uncomment if using FOR loop
+    %L=spin_system.control.drifts{:};
       
     % Add offset terms
     if ~isempty(off_ens_sizes)
