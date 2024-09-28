@@ -908,15 +908,17 @@ else
     
 end
 
-% Process response functions and Jacobian functions
-if isfield(control, 'response')
+% Process response functions and Jacobian functions or response matrices
+ if isfield(control, 'response')
     if iscell(control.response)
-        % Check if the cell array has exactly 3 elements
-        if numel(control.response) == 3
+        num_elements = numel(control.response);
+        
+        if num_elements == 3
+            % Existing code for processing the cell array with 3 elements
             % Extract the components
             response_function = control.response{1};
             jacobian_function = control.response{2};
-            parameters = control.response{3};
+            response_parameters = control.response{3};
             
             % Validate response_function
             if ~isa(response_function, 'function_handle')
@@ -929,43 +931,69 @@ if isfield(control, 'response')
             end
             
             % Validate parameters
-            if ~iscell(parameters)
+            if ~iscell(response_parameters)
                 error('The response function parameters must be provided in a cell array.');
-            end
-            
-            % Initialize a flag for finite differences
-            use_finite_differences = false;
+            end          
             
             % Check if jacobian_function is empty
             if isempty(jacobian_function)
                 % Warn that finite differences will be used
                 warning('The Jacobian function is not provided. Estimating it using finite differences, which may take a long time.');
-                use_finite_differences = true;
             elseif isequal(response_function, jacobian_function)
                 % Inform that the response function is linear
                 warning('The response function and the Jacobian function are the same. Assuming a linear response function.');
             end
             
             % Store the response functions and parameters
-            spin_system.control.response_function = response_function;
-            spin_system.control.jacobian_function = jacobian_function;
-            spin_system.control.response_parameters = parameters;
-            spin_system.control.use_finite_differences = use_finite_differences;
+            spin_system.control.response{1} = response_function;
+            spin_system.control.response{2} = jacobian_function;
+            spin_system.control.response{3} = response_parameters;
             control = rmfield(control, 'response');
             
+        elseif num_elements == 2
+            % New code to handle the case where control.response has 2 elements
+            % Extract the matrices
+            matrix1 = control.response{1};
+            matrix2 = control.response{2};
+            
+            % Validate that both elements are matrices
+            if ~ismatrix(matrix1) || ~ismatrix(matrix2)
+                error('Both elements in ''control.response'' must be matrices.');
+            end
+
+             for i = 1:2
+                 if size(control.response{i}, 2) ~= numel(spin_system.control.pulse_dt)
+                    error('Response matrices do not match the size of pulse_dt.')
+                 end
+             end
+
+            
+            % Store the matrices
+            spin_system.control.response{1} = matrix1;
+            spin_system.control.response{2} = matrix2;
+            control = rmfield(control, 'response');
+            report(spin_system,'Two Matricies Provided for the Response Function. Assuming Linear Response: Matrix 1 response for Lx, Matrix 2 response for Ly. ');
+        
+        elseif num_elements == 0
+            % Response functions not provided
+            report(spin_system,'No ''control.response'' field provided. Proceeding without response function input. Normal GRAPE applied.');
+            control = rmfield(control, 'response');
         else
-            % Response cell array must have exactly 3 elements
-            error('The ''control.response'' field must be a cell array with exactly three elements: {@response_function, @jacobian_function (optional), {parameters}}.');
+            % Invalid number of elements in 'control.response'
+            error(['The ''control.response'' field must be a cell array. Non-linear functions - three elements ' ...
+                   '({@response_function, @jacobian_function (optional), {parameters}}). Linear Functions: two matricies acting on Lx and Ly.']);
         end
+        
     else
-        % Invalid response field type
-        error('The ''control.response'' field must be a cell array. Expected format: {@response_function, @jacobian_function (optional), {parameters}}.');
+        % Invalid 'control.response' field type
+            error(['The ''control.response'' field must be a cell array. Non-linear functions - three elements ' ...
+                   '({@response_function, @jacobian_function (optional), {parameters}}). Linear Functions: two matricies acting on Lx and Ly.']);
     end
 else
     % Response functions not provided
-    control = rmfield(control, 'response');
-    warning('No ''control.response'' field provided. Proceeding without response function input. Normal GRAPE applied.');
+    report(spin_system,'No ''control.response'' field provided. Proceeding without response function input. Normal GRAPE applied.');
 end
+
 
 % Inform the user
 report(spin_system,[pad('Control power modulation frequency, Hz',60) ...
